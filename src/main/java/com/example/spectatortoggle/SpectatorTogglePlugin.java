@@ -7,14 +7,9 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Monster;
-import org.bukkit.entity.Slime;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -33,20 +28,6 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
     private final Map<UUID, SavedState> savedStates = new HashMap<UUID, SavedState>();
     private final Set<UUID> spectatorRoleMembers = new HashSet<UUID>();
-    private static final Set<String> HOSTILE_ENTITY_TYPES = new HashSet<String>();
-
-    static {
-        String[] hostileTypes = {
-                "GHAST", "PHANTOM", "SHULKER", "ENDER_DRAGON", "WITHER",
-                "RAVAGER", "HOGLIN", "ZOGLIN", "ZOMBIFIED_PIGLIN", "PIGLIN_BRUTE",
-                "WARDEN", "BREEZE", "BOGGED", "VEX", "EVOKER", "VINDICATOR",
-                "ILLUSIONER", "GUARDIAN", "ELDER_GUARDIAN", "ENDERMITE", "SILVERFISH",
-                "CAVE_SPIDER", "SPIDER"
-        };
-        for (String hostileType : hostileTypes) {
-            HOSTILE_ENTITY_TYPES.add(hostileType);
-        }
-    }
 
     @Override
     public void onEnable() {
@@ -65,7 +46,6 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
         }
 
         getServer().getPluginManager().registerEvents(this, this);
-        removeHostileEntities();
         getLogger().info("SpectatorToggle enabled for Paper 1.16.5 and newer.");
     }
 
@@ -329,30 +309,6 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
                 removePersistedState(uuid);
             }
         });
-    }
-
-    @EventHandler
-    public void onEnemySpawn(EntitySpawnEvent event) {
-        if (isHostile(event.getEntity())) {
-            event.setCancelled(true);
-        }
-    }
-
-    private void removeHostileEntities() {
-        getServer().getWorlds().forEach(world ->
-                world.getEntities().stream()
-                        .filter(this::isHostile)
-                        .forEach(Entity::remove)
-        );
-    }
-
-    private boolean isHostile(Entity entity) {
-        if (!(entity instanceof LivingEntity)) {
-            return false;
-        }
-        return entity instanceof Monster
-                || entity instanceof Slime
-                || HOSTILE_ENTITY_TYPES.contains(entity.getType().name());
     }
 
     @EventHandler

@@ -1,5 +1,5 @@
 name: SpectatorToggle
-version: 1.2.0
+version: 1.2.1
 main: com.example.spectatortoggle.SpectatorTogglePlugin
 description: وضع مشاهدة مع رتبة Spectator وأوامر انتقال خاصة ومتوافق مع Paper 1.16.5 وما بعده.
 author: Manus AI

@@ -4,7 +4,7 @@
 
 ## نطاق التوافق
 
-الإصدار `1.2.0` مبني على Bukkit/Spigot API قديمة ومستقرة مع bytecode متوافق مع **Java 8**، ولذلك يستهدف ملف JAR واحدًا لخوادم **Paper 1.16.5 إلى Paper 1.21.x**، بما في ذلك Paper 1.21.11. تم اختبار تحميل النسخة الجديدة على Paper 1.21.11، بينما يعتمد التشغيل على API المشتركة الموجودة في النطاق المذكور.
+الإصدار `1.2.1` مبني على Bukkit/Spigot API قديمة ومستقرة مع bytecode متوافق مع **Java 8**، ولذلك يستهدف ملف JAR واحدًا لخوادم **Paper 1.16.5 إلى Paper 1.21.x**، بما في ذلك Paper 1.21.11. تم اختبار تحميل النسخة الجديدة على Paper 1.21.11، بينما يعتمد التشغيل على API المشتركة الموجودة في النطاق المذكور.
 
 > لا أضمن تشغيل النسخة على Paper 1.12 أو أقدم. إذا احتجت دعم 1.8–1.12، فالأفضل إصدار فرعي منفصل بسبب اختلافات API وملفات `plugin.yml`.
 
@@ -14,7 +14,7 @@
 | Minecraft / Paper الحديث المدعوم | 1.21.x، وتم الاختبار على 1.21.11 |
 | Java المطلوبة لتشغيل الخادم | حسب متطلبات إصدار Paper المستخدم |
 | Java المطلوبة للبناء من المصدر | Java 8 أو أحدث |
-| ملف JAR | `spectator-toggle-1.2.0.jar` |
+| ملف JAR | `spectator-toggle-1.2.1.jar` |
 
 اعتمد المشروع على Bukkit API المشتركة بدل خصائص Paper الحديثة الخاصة بإصدار واحد. كما تم استخدام صياغة Java 8 وإزالة الاعتماد على `Adventure Component` وواجهات الكائنات التي لا توجد في API القديمة. توضح وثائق Paper أن قيمة `api-version` تحدد الحد الأدنى للإصدار الذي يسمح الخادم بتحميل البلوقن عليه [1]، كما تحذّر وثائق API من افتراض ثبات كل التفاصيل عبر الإصدارات الرئيسية [2].
 
@@ -30,11 +30,11 @@
 
 ## التثبيت
 
-1. نزّل ملف `spectator-toggle-1.2.0.jar` من صفحة الإصدار في GitHub.
+1. نزّل ملف `spectator-toggle-1.2.1.jar` من صفحة الإصدار في GitHub.
 2. انسخ الملف إلى مجلد `plugins` داخل خادم Paper.
 3. احذف أي نسخة أقدم من `SpectatorToggle` حتى لا يتم تحميل نسختين.
 4. شغّل الخادم أو أعد تشغيله.
-5. تحقق من سجل الخادم من ظهور `SpectatorToggle v1.2.0` ثم رسالة التفعيل.
+5. تحقق من سجل الخادم من ظهور `SpectatorToggle v1.2.1` ثم رسالة التفعيل.
 
 لا يحتاج البلوقن إلى مكتبات خارجية. ملف JAR واحد يكفي للتثبيت.
 
@@ -128,10 +128,6 @@ players: {}
 
 يفضل تغيير الإعداد باستخدام أوامر `/specadmin` بدل تعديل قائمة الأعضاء يدويًا، حتى يتم حفظ UUID الصحيح لكل لاعب.
 
-## إزالة الوحوش
-
-البلوقن يمنع ظهور الوحوش العدائية عبر `EntitySpawnEvent` ويحاول إزالة الوحوش الموجودة عند تشغيله. يعتمد كشف الوحوش على API متوافقة مع الإصدارات القديمة، مع قائمة أسماء للكائنات التي ظهرت في الإصدارات الأحدث. تبقى الحيوانات العادية واللاعبون دون تغيير.
-
 ## الصلاحيات
 
 | الصلاحية | الاستخدام | الافتراضي |
@@ -158,13 +154,13 @@ mvn clean package
 سيتم إنشاء الملف:
 
 ```text
-target/spectator-toggle-1.2.0.jar
+target/spectator-toggle-1.2.1.jar
 ```
 
 تحقق من أن إصدار bytecode هو Java 8 عبر:
 
 ```bash
-javap -verbose -classpath target/spectator-toggle-1.2.0.jar \
+javap -verbose -classpath target/spectator-toggle-1.2.1.jar \
   com.example.spectatortoggle.SpectatorTogglePlugin | grep 'major version'
 ```
 
@@ -181,7 +177,7 @@ spectator-toggle/
 ├── pom.xml
 ├── README.md
 ├── compatibility-notes.md
-├── spectator-toggle-1.2.0.jar
+├── spectator-toggle-1.2.1.jar
 └── src/
     └── main/
         ├── java/com/example/spectatortoggle/SpectatorTogglePlugin.java
