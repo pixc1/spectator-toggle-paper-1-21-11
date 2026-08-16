@@ -1,0 +1,29 @@
+name: SpectatorToggle
+version: 1.1.0
+main: com.example.spectatortoggle.SpectatorTogglePlugin
+description: وضع مشاهدة مع رتبة Spectator وأوامر انتقال خاصة.
+author: Manus AI
+api-version: '1.21.11'
+
+commands:
+  spec:
+    description: تفعيل أو إيقاف وضع المشاهدة.
+    usage: /spec
+    permission: spectator.use
+    permission-message: ليس لديك صلاحية استخدام هذا الأمر.
+  specadmin:
+    description: إدارة رتبة Spectator وإعداد الوصول.
+    usage: /specadmin <create|mode|add|remove|list>
+    permission: spectator.admin
+    permission-message: ليس لديك صلاحية إدارة رتبة Spectator.
+  specgoto:
+    description: الانتقال إلى لاعب موجود في وضع المشاهدة لأعضاء رتبة Spectator.
+    usage: /specgoto <اسم اللاعب>
+
+permissions:
+  spectator.use:
+    description: يسمح باستخدام أمر /spec عندما يكون الوصول عامًا.
+    default: true
+  spectator.admin:
+    description: يسمح بإنشاء وإدارة رتبة Spectator وتحديد وضع الوصول.
+    default: op

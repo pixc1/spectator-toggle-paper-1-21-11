@@ -1,0 +1,7 @@
+# SpectatorToggle persistent player states
+# spec-access: all or role
+spec-access: all
+spectator-role:
+  created: false
+  members: []
+players: {}
