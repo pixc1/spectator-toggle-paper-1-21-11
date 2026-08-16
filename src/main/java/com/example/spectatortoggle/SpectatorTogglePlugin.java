@@ -1,7 +1,5 @@
 package com.example.spectatortoggle;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -9,7 +7,10 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Enemy;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
+import org.bukkit.entity.Slime;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -30,8 +31,22 @@ import java.util.UUID;
 
 public final class SpectatorTogglePlugin extends JavaPlugin implements CommandExecutor, Listener {
 
-    private final Map<UUID, SavedState> savedStates = new HashMap<>();
-    private final Set<UUID> spectatorRoleMembers = new HashSet<>();
+    private final Map<UUID, SavedState> savedStates = new HashMap<UUID, SavedState>();
+    private final Set<UUID> spectatorRoleMembers = new HashSet<UUID>();
+    private static final Set<String> HOSTILE_ENTITY_TYPES = new HashSet<String>();
+
+    static {
+        String[] hostileTypes = {
+                "GHAST", "PHANTOM", "SHULKER", "ENDER_DRAGON", "WITHER",
+                "RAVAGER", "HOGLIN", "ZOGLIN", "ZOMBIFIED_PIGLIN", "PIGLIN_BRUTE",
+                "WARDEN", "BREEZE", "BOGGED", "VEX", "EVOKER", "VINDICATOR",
+                "ILLUSIONER", "GUARDIAN", "ELDER_GUARDIAN", "ENDERMITE", "SILVERFISH",
+                "CAVE_SPIDER", "SPIDER"
+        };
+        for (String hostileType : hostileTypes) {
+            HOSTILE_ENTITY_TYPES.add(hostileType);
+        }
+    }
 
     @Override
     public void onEnable() {
@@ -51,7 +66,7 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
         getServer().getPluginManager().registerEvents(this, this);
         removeHostileEntities();
-        getLogger().info("SpectatorToggle enabled for Paper 1.21.11.");
+        getLogger().info("SpectatorToggle enabled for Paper 1.16.5 and newer.");
     }
 
     @Override
@@ -65,10 +80,9 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
             if (player.getGameMode() == GameMode.SPECTATOR) {
                 player.setGameMode(GameMode.SURVIVAL);
-                player.teleport(state.location());
+                player.teleport(state.location);
             }
 
-            // Never leave a stale state behind when the player was already Survival.
             savedStates.remove(uuid);
             removePersistedState(uuid);
         }
@@ -87,13 +101,14 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
             return handleSpectatorGoto(sender, args);
         }
 
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("هذا الأمر مخصص للاعبين فقط.", NamedTextColor.RED));
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("هذا الأمر مخصص للاعبين فقط.");
             return true;
         }
 
+        Player player = (Player) sender;
         if (!canUseSpec(player)) {
-            player.sendMessage(Component.text("أمر /spec متاح فقط لأعضاء رتبة Spectator حاليًا.", NamedTextColor.RED));
+            player.sendMessage("أمر /spec متاح فقط لأعضاء رتبة Spectator حاليًا.");
             return true;
         }
 
@@ -107,7 +122,7 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
     private boolean handleAdminCommand(CommandSender sender, String[] args) {
         if (!sender.hasPermission("spectator.admin")) {
-            sender.sendMessage(Component.text("ليس لديك صلاحية إدارة رتبة Spectator.", NamedTextColor.RED));
+            sender.sendMessage("ليس لديك صلاحية إدارة رتبة Spectator.");
             return true;
         }
 
@@ -116,100 +131,98 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
             return true;
         }
 
-        switch (args[0].toLowerCase()) {
-            case "create" -> {
-                getConfig().set("spectator-role.created", true);
-                saveConfig();
-                sender.sendMessage(Component.text("تم إنشاء رتبة Spectator داخل البلوقن.", NamedTextColor.GREEN));
+        String subcommand = args[0].toLowerCase();
+        if (subcommand.equals("create")) {
+            getConfig().set("spectator-role.created", true);
+            saveConfig();
+            sender.sendMessage("تم إنشاء رتبة Spectator داخل البلوقن.");
+        } else if (subcommand.equals("mode")) {
+            if (args.length < 2 || (!args[1].equalsIgnoreCase("all") && !args[1].equalsIgnoreCase("role"))) {
+                sender.sendMessage("الاستخدام: /specadmin mode all أو /specadmin mode role");
+                return true;
             }
-            case "mode" -> {
-                if (args.length < 2 || (!args[1].equalsIgnoreCase("all") && !args[1].equalsIgnoreCase("role"))) {
-                    sender.sendMessage(Component.text("الاستخدام: /specadmin mode all أو /specadmin mode role", NamedTextColor.YELLOW));
-                    return true;
-                }
-                if (args[1].equalsIgnoreCase("role") && !isRoleCreated()) {
-                    sender.sendMessage(Component.text("أنشئ الرتبة أولًا باستخدام /specadmin create.", NamedTextColor.RED));
-                    return true;
-                }
-                getConfig().set("spec-access", args[1].toLowerCase());
-                saveConfig();
-                String message = args[1].equalsIgnoreCase("all")
-                        ? "أصبح أمر /spec متاحًا لجميع اللاعبين."
-                        : "أصبح أمر /spec متاحًا لأعضاء رتبة Spectator فقط.";
-                sender.sendMessage(Component.text(message, NamedTextColor.GREEN));
+            if (args[1].equalsIgnoreCase("role") && !isRoleCreated()) {
+                sender.sendMessage("أنشئ الرتبة أولًا باستخدام /specadmin create.");
+                return true;
             }
-            case "add", "give" -> {
-                if (args.length < 2) {
-                    sender.sendMessage(Component.text("الاستخدام: /specadmin add <اسم اللاعب>", NamedTextColor.YELLOW));
-                    return true;
-                }
-                if (!isRoleCreated()) {
-                    sender.sendMessage(Component.text("أنشئ الرتبة أولًا باستخدام /specadmin create.", NamedTextColor.RED));
-                    return true;
-                }
-                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
-                spectatorRoleMembers.add(target.getUniqueId());
-                saveRoleMembers();
-                sender.sendMessage(Component.text("تمت إضافة " + args[1] + " إلى رتبة Spectator.", NamedTextColor.GREEN));
+            getConfig().set("spec-access", args[1].toLowerCase());
+            saveConfig();
+            if (args[1].equalsIgnoreCase("all")) {
+                sender.sendMessage("أصبح أمر /spec متاحًا لجميع اللاعبين.");
+            } else {
+                sender.sendMessage("أصبح أمر /spec متاحًا لأعضاء رتبة Spectator فقط.");
             }
-            case "remove", "take" -> {
-                if (args.length < 2) {
-                    sender.sendMessage(Component.text("الاستخدام: /specadmin remove <اسم اللاعب>", NamedTextColor.YELLOW));
-                    return true;
-                }
-                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
-                spectatorRoleMembers.remove(target.getUniqueId());
-                saveRoleMembers();
-                sender.sendMessage(Component.text("تمت إزالة " + args[1] + " من رتبة Spectator.", NamedTextColor.YELLOW));
+        } else if (subcommand.equals("add") || subcommand.equals("give")) {
+            if (args.length < 2) {
+                sender.sendMessage("الاستخدام: /specadmin add <اسم اللاعب>");
+                return true;
             }
-            case "list" -> {
-                sender.sendMessage(Component.text("أعضاء رتبة Spectator: " + spectatorRoleMembers.size(), NamedTextColor.AQUA));
-                for (UUID uuid : spectatorRoleMembers) {
-                    OfflinePlayer member = Bukkit.getOfflinePlayer(uuid);
-                    sender.sendMessage(Component.text("- " + (member.getName() == null ? uuid : member.getName()), NamedTextColor.GRAY));
-                }
+            if (!isRoleCreated()) {
+                sender.sendMessage("أنشئ الرتبة أولًا باستخدام /specadmin create.");
+                return true;
             }
-            default -> sendAdminHelp(sender);
+            OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+            spectatorRoleMembers.add(target.getUniqueId());
+            saveRoleMembers();
+            sender.sendMessage("تمت إضافة " + args[1] + " إلى رتبة Spectator.");
+        } else if (subcommand.equals("remove") || subcommand.equals("take")) {
+            if (args.length < 2) {
+                sender.sendMessage("الاستخدام: /specadmin remove <اسم اللاعب>");
+                return true;
+            }
+            OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+            spectatorRoleMembers.remove(target.getUniqueId());
+            saveRoleMembers();
+            sender.sendMessage("تمت إزالة " + args[1] + " من رتبة Spectator.");
+        } else if (subcommand.equals("list")) {
+            sender.sendMessage("أعضاء رتبة Spectator: " + spectatorRoleMembers.size());
+            for (UUID uuid : spectatorRoleMembers) {
+                OfflinePlayer member = Bukkit.getOfflinePlayer(uuid);
+                sender.sendMessage("- " + (member.getName() == null ? uuid.toString() : member.getName()));
+            }
+        } else {
+            sendAdminHelp(sender);
         }
         return true;
     }
 
     private boolean handleSpectatorGoto(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("هذا الأمر مخصص للاعبين فقط.", NamedTextColor.RED));
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("هذا الأمر مخصص للاعبين فقط.");
             return true;
         }
+        Player player = (Player) sender;
         if (!isRoleMember(player)) {
-            player.sendMessage(Component.text("هذا الأمر مخصص لأعضاء رتبة Spectator فقط.", NamedTextColor.RED));
+            player.sendMessage("هذا الأمر مخصص لأعضاء رتبة Spectator فقط.");
             return true;
         }
         if (args.length < 1) {
-            player.sendMessage(Component.text("الاستخدام: /specgoto <اسم لاعب في وضع المشاهدة>", NamedTextColor.YELLOW));
+            player.sendMessage("الاستخدام: /specgoto <اسم لاعب في وضع المشاهدة>");
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            player.sendMessage(Component.text("اللاعب غير متصل حاليًا.", NamedTextColor.RED));
+            player.sendMessage("اللاعب غير متصل حاليًا.");
             return true;
         }
         if (!savedStates.containsKey(target.getUniqueId()) || target.getGameMode() != GameMode.SPECTATOR) {
-            player.sendMessage(Component.text("اللاعب المحدد ليس في وضع المشاهدة حاليًا.", NamedTextColor.RED));
+            player.sendMessage("اللاعب المحدد ليس في وضع المشاهدة حاليًا.");
             return true;
         }
 
         player.teleport(target.getLocation());
-        player.sendMessage(Component.text("تم نقلك إلى مكان اللاعب " + target.getName() + ".", NamedTextColor.GREEN));
+        player.sendMessage("تم نقلك إلى مكان اللاعب " + target.getName() + ".");
         return true;
     }
 
     private void sendAdminHelp(CommandSender sender) {
-        sender.sendMessage(Component.text("أوامر إدارة رتبة Spectator:", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("/specadmin create - إنشاء الرتبة", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/specadmin mode all|role - تحديد من يستخدم /spec", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/specadmin add <player> - إعطاء الرتبة", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/specadmin remove <player> - إزالة الرتبة", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/specadmin list - عرض الأعضاء", NamedTextColor.GRAY));
+        sender.sendMessage("أوامر إدارة رتبة Spectator:");
+        sender.sendMessage("/specadmin create - إنشاء الرتبة");
+        sender.sendMessage("/specadmin mode all|role - تحديد من يستخدم /spec");
+        sender.sendMessage("/specadmin add <player> - إعطاء الرتبة");
+        sender.sendMessage("/specadmin remove <player> - إزالة الرتبة");
+        sender.sendMessage("/specadmin list - عرض الأعضاء");
     }
 
     private boolean canUseSpec(Player player) {
@@ -237,7 +250,7 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
     }
 
     private void saveRoleMembers() {
-        List<String> members = new ArrayList<>();
+        List<String> members = new ArrayList<String>();
         for (UUID uuid : spectatorRoleMembers) {
             members.add(uuid.toString());
         }
@@ -250,7 +263,7 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
         savedStates.put(player.getUniqueId(), state);
         persistState(player.getUniqueId(), state);
         player.setGameMode(GameMode.SPECTATOR);
-        player.sendMessage(Component.text("تم تفعيل وضع المشاهدة. استخدم /spec للعودة.", NamedTextColor.GREEN));
+        player.sendMessage("تم تفعيل وضع المشاهدة. استخدم /spec للعودة.");
     }
 
     private void exitSpectator(Player player) {
@@ -261,8 +274,8 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
         removePersistedState(player.getUniqueId());
         player.setGameMode(GameMode.SURVIVAL);
-        player.teleport(state.location());
-        player.sendMessage(Component.text("تم إيقاف وضع المشاهدة وإعادتك إلى مكانك السابق في Survival.", NamedTextColor.YELLOW));
+        player.teleport(state.location);
+        player.sendMessage("تم إيقاف وضع المشاهدة وإعادتك إلى مكانك السابق في Survival.");
     }
 
     private void loadSavedStates() {
@@ -274,9 +287,8 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
             try {
                 UUID uuid = UUID.fromString(key);
                 Location location = getConfig().getLocation("players." + key + ".location");
-                String modeName = getConfig().getString("players." + key + ".game-mode", GameMode.SURVIVAL.name());
                 if (location != null) {
-                    savedStates.put(uuid, new SavedState(location, GameMode.valueOf(modeName)));
+                    savedStates.put(uuid, new SavedState(location, GameMode.SURVIVAL));
                 }
             } catch (IllegalArgumentException exception) {
                 getLogger().warning("تعذر تحميل حالة اللاعب: " + key);
@@ -286,8 +298,8 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
     private void persistState(UUID uuid, SavedState state) {
         String path = "players." + uuid;
-        getConfig().set(path + ".location", state.location());
-        getConfig().set(path + ".game-mode", state.gameMode().name());
+        getConfig().set(path + ".location", state.location);
+        getConfig().set(path + ".game-mode", state.gameMode.name());
         saveConfig();
     }
 
@@ -298,31 +310,30 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
+        final Player player = event.getPlayer();
+        final UUID uuid = player.getUniqueId();
 
-        // Apply after the player has fully joined. Creative is the only mode preserved.
-        getServer().getScheduler().runTask(this, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-
-            if (player.getGameMode() != GameMode.CREATIVE) {
-                if (player.getGameMode() != GameMode.SURVIVAL) {
-                    player.setGameMode(GameMode.SURVIVAL);
-                    player.sendMessage(Component.text("تم تحويلك تلقائيًا إلى Survival عند الدخول.", NamedTextColor.YELLOW));
+        getServer().getScheduler().runTask(this, new Runnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    return;
                 }
-            }
 
-            // Always clear old Spectator records on join so they cannot affect future logins.
-            savedStates.remove(uuid);
-            removePersistedState(uuid);
+                if (player.getGameMode() != GameMode.CREATIVE && player.getGameMode() != GameMode.SURVIVAL) {
+                    player.setGameMode(GameMode.SURVIVAL);
+                    player.sendMessage("تم تحويلك تلقائيًا إلى Survival عند الدخول.");
+                }
+
+                savedStates.remove(uuid);
+                removePersistedState(uuid);
+            }
         });
     }
 
     @EventHandler
     public void onEnemySpawn(EntitySpawnEvent event) {
-        if (event.getEntity() instanceof Enemy) {
+        if (isHostile(event.getEntity())) {
             event.setCancelled(true);
         }
     }
@@ -330,15 +341,25 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
     private void removeHostileEntities() {
         getServer().getWorlds().forEach(world ->
                 world.getEntities().stream()
-                        .filter(entity -> entity instanceof Enemy)
-                        .forEach(entity -> entity.remove())
+                        .filter(this::isHostile)
+                        .forEach(Entity::remove)
         );
+    }
+
+    private boolean isHostile(Entity entity) {
+        if (!(entity instanceof LivingEntity)) {
+            return false;
+        }
+        return entity instanceof Monster
+                || entity instanceof Slime
+                || HOSTILE_ENTITY_TYPES.contains(entity.getType().name());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        if (savedStates.containsKey(event.getPlayer().getUniqueId())) {
-            persistState(event.getPlayer().getUniqueId(), savedStates.get(event.getPlayer().getUniqueId()));
+        UUID uuid = event.getPlayer().getUniqueId();
+        if (savedStates.containsKey(uuid)) {
+            persistState(uuid, savedStates.get(uuid));
         }
     }
 
@@ -354,10 +375,17 @@ public final class SpectatorTogglePlugin extends JavaPlugin implements CommandEx
     public void onWorldChange(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         if (savedStates.containsKey(player.getUniqueId())) {
-            player.sendMessage(Component.text("أنت ما زلت في وضع المشاهدة. استخدم /spec للعودة إلى مكان التفعيل.", NamedTextColor.AQUA));
+            player.sendMessage("أنت ما زلت في وضع المشاهدة. استخدم /spec للعودة إلى مكان التفعيل.");
         }
     }
 
-    private record SavedState(Location location, GameMode gameMode) {
+    private static final class SavedState {
+        private final Location location;
+        private final GameMode gameMode;
+
+        private SavedState(Location location, GameMode gameMode) {
+            this.location = location;
+            this.gameMode = gameMode;
+        }
     }
 }
